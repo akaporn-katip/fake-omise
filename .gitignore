@@ -1,0 +1,13 @@
+# Build output
+/fake-omise
+/dist/
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
