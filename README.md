@@ -63,6 +63,24 @@ curl -s -u skey_test_4xs8breq3htbkj03d2x: -X POST \
 | `-webhook` | none | URL that receives event webhooks |
 | `-base-url` | request host | origin used to build `authorize_uri` |
 
+## Docker
+
+```bash
+docker build -t fake-omise .
+docker run --rm -p 8080:8080 -v fake-omise-data:/data fake-omise
+
+# any flag can be passed through
+docker run --rm -p 8080:8080 fake-omise -3ds zero_amount -webhook http://host.docker.internal:9000/hook
+```
+
+The image is distroless, runs as non-root, and keeps its SQLite database in `/data` (mount a volume to
+survive restarts). CI builds and smoke-tests the image on every push; tagged releases publish
+multi-arch images to GHCR:
+
+```bash
+docker run --rm -p 8080:8080 ghcr.io/akaporn-katip/fake-omise:v0.1.0
+```
+
 ## Embedded in Go tests
 
 ```go

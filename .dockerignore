@@ -1,0 +1,10 @@
+.git
+.github
+*.db
+*.db-shm
+*.db-wal
+dist/
+fake-omise
+README.md
+CONTEXT.md
+docs/

@@ -94,3 +94,54 @@ jobs:
           name: fake-omise-linux-amd64
           path: fake-omise
           if-no-files-found: error
+
+  docker:
+    name: docker image
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: fake-omise:ci
+          build-args: |
+            VERSION=ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the image
+        run: |
+          docker run -d --name fake-omise-ci -p 18080:8080 fake-omise:ci
+          trap 'docker logs fake-omise-ci || true; docker rm -f fake-omise-ci || true' EXIT
+
+          for _ in $(seq 1 40); do
+            if curl -sf -u skey_test_ci: http://127.0.0.1:18080/charges >/dev/null; then
+              break
+            fi
+            sleep 0.5
+          done
+
+          # The distroless image is non-root and must be able to write its SQLite file.
+          token=$(curl -sf -u skey_test_ci: http://127.0.0.1:18080/tokens \
+            -d 'card[number]=4242424242424242' \
+            -d 'card[expiration_month]=12' \
+            -d 'card[expiration_year]=2030' \
+            -d 'card[security_code]=123')
+          echo "$token" | grep -q '"object": "token"'
+
+          # A customer is created from a token, not from a card identifier.
+          token_id=$(echo "$token" | sed -n 's/.*"id": "\(tokn_test_[^"]*\)".*/\1/p' | head -1)
+          customer=$(curl -sf -u skey_test_ci: http://127.0.0.1:18080/customers -d "card=$token_id")
+          echo "$customer" | grep -q '"object": "customer"'
+
+          charge=$(curl -sf -u skey_test_ci: http://127.0.0.1:18080/charges \
+            -d amount=0 -d currency=THB -d "customer=$(echo "$customer" | sed -n 's/.*"id": "\(cust_test_[^"]*\)".*/\1/p' | head -1)" \
+            -d 'return_uri=https://merchant.example/complete')
+          echo "$charge" | grep -q '"status": "pending"'
+          echo "image smoke test passed"
